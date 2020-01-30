@@ -482,8 +482,8 @@ static int init_function(void) {
 	int defaultValue = 0;
 	//initialized list
 	struct pid_list some_list
-	INIT_LIST_HEAD (&some_list);
-	for(count=0 < NR_syscalls + 1; count++){
+	INIT_LIST_HEAD (&some_list); 
+	for(count=0; count < NR_syscalls + 1; count++){
 		//initializing syscall values
 		table[count].intercepted = defaultValue;
 		table[count].monitored = defaultValue;
