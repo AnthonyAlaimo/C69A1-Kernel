@@ -470,10 +470,28 @@ long (*orig_custom_syscall)(void);
  * - Ensure synchronization as needed.
  */
 static int init_function(void) {
-
-
-
-
+	//MISSING SPIN LOCKS!!
+	//save the original values of MY_CUSTOM_SYSCALL and __NR_exit_group (aka Hijack MY CUSTOM SYSCALL)
+	orig_custom_syscall = sys_call_table[MY_CUSTOM_SYSCALL];
+	orig_exit_group = sys_call_table[__NR_exit_group];
+	//making system call table writable
+	set_addr_rw((unsigned long) sys_call_table);
+	//initialize the list 
+	int count;
+	// default system values 
+	int defaultValue = 0;
+	//initialized list
+	struct pid_list some_list
+	INIT_LIST_HEAD (&some_list);
+	for(count=0 < NR_syscalls + 1; count++){
+		//initializing syscall values
+		table[count].intercepted = defaultValue;
+		table[count].monitored = defaultValue;
+		table[count].listcount = defaultValue;
+				
+	}
+	//setting system call table back to read only
+	set_addr_ro((unsigned long) sys_call_table);
 }
 
 /**
@@ -487,7 +505,7 @@ static int init_function(void) {
  * - Ensure synchronization, if needed.
  */
 static void exit_function(void)
-{        
+{
 
 
 
