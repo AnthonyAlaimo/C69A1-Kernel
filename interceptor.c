@@ -283,7 +283,7 @@ void my_exit_group(int status)
 
 asmlinkage long interceptor(struct pt_regs reg) {
 	//FIX THE LOCKS!!
-	aquire(&pidlist_lock);
+	spin_lock(&pidlist_lock);
 	//first we want to check that the system call is being monitored for the current pid
 	//if the current pid is being monitored in the systemcall then we log its parameters
 	//reg.ax is the first parameter (head of the system call), so we want to check for the pid value there
@@ -474,6 +474,7 @@ static int init_function(void) {
 	//save the original values of MY_CUSTOM_SYSCALL and __NR_exit_group (aka Hijack MY CUSTOM SYSCALL)
 	orig_custom_syscall = sys_call_table[MY_CUSTOM_SYSCALL];
 	orig_exit_group = sys_call_table[__NR_exit_group];
+	spin_lock(&calltable_lock);
 	//making system call table writable
 	set_addr_rw((unsigned long) sys_call_table);
 	//initialize the list 
@@ -492,6 +493,7 @@ static int init_function(void) {
 	}
 	//setting system call table back to read only
 	set_addr_ro((unsigned long) sys_call_table);
+	spin_unlock(&calltable_lock);
 }
 
 /**
@@ -507,7 +509,7 @@ static int init_function(void) {
 static void exit_function(void)
 {
 	//implement locks!!!
-
+	spin_lock(&calltable_lock);
 	//making system call table writable
 	set_addr_rw((unsigned long) sys_call_table);
 	//restoring the original values of the syscall table that were stored in
@@ -516,6 +518,7 @@ static void exit_function(void)
 	sys_call_table[__NR_exit_group] = orig_exit_group;
 	//setting system call table back to read only
 	set_addr_ro((unsigned long) sys_call_table);
+	spin_unlock(&calltable_lock);
 
 }
 
