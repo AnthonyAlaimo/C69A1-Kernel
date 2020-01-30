@@ -282,8 +282,8 @@ void my_exit_group(int status)
  //
 
 asmlinkage long interceptor(struct pt_regs reg) {
-	//need to use locks so log messages for pids dont occur simultaneously
-	aquire(&pidlist_lock);.
+	//FIX THE LOCKS!!
+	aquire(&pidlist_lock);
 	//first we want to check that the system call is being monitored for the current pid
 	//if the current pid is being monitored in the systemcall then we log its parameters
 	//reg.ax is the first parameter (head of the system call), so we want to check for the pid value there
@@ -506,11 +506,16 @@ static int init_function(void) {
  */
 static void exit_function(void)
 {
+	//implement locks!!!
 
-
-
-
-
+	//making system call table writable
+	set_addr_rw((unsigned long) sys_call_table);
+	//restoring the original values of the syscall table that were stored in
+	//our origcustomsyscall and origexitgroup.
+	sys_call_table[MY_CUSTOM_SYSCALL] = orig_custom_syscall;
+	sys_call_table[__NR_exit_group] = orig_exit_group;
+	//setting system call table back to read only
+	set_addr_ro((unsigned long) sys_call_table);
 
 }
 
