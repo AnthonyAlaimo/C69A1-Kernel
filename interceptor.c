@@ -291,7 +291,7 @@ asmlinkage long interceptor(struct pt_regs reg) {
 		//want to log the parameters of the syscall which are ax,bx,...,bp registers for the current pid
 		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);
 	}
-	release(&pidlist_lock);
+	spin_unlock(&pidlist_lock);
 	//we need to call the original system call so processes proceed as normal
 	return (*f)(struct pt_regs);
 }
