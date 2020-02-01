@@ -512,6 +512,10 @@ long (*orig_custom_syscall)(void);
  */
 static int init_function(void) {
 	//MISSING SPIN LOCKS!!
+	int defaultValue = 0;
+	//initialized list
+	struct pid_list some_list
+	INIT_LIST_HEAD (&some_list); 
 	//save the original values of MY_CUSTOM_SYSCALL and __NR_exit_group (aka Hijack MY CUSTOM SYSCALL)
 	orig_custom_syscall = sys_call_table[MY_CUSTOM_SYSCALL];
 	orig_exit_group = sys_call_table[__NR_exit_group];
@@ -521,10 +525,7 @@ static int init_function(void) {
 	//initialize the list 
 	//int count = 0;
 	// default system values 
-	int defaultValue = 0;
-	//initialized list
-	struct pid_list some_list
-	INIT_LIST_HEAD (&some_list); 
+	
 	for(int count=0; count < NR_syscalls + 1; count++){
 		//initializing syscall values
 		table[count].intercepted = defaultValue;
