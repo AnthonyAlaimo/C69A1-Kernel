@@ -525,7 +525,7 @@ static int init_function(void) {
 	//initialized list
 	struct pid_list some_list
 	INIT_LIST_HEAD (&some_list); 
-	for(count=0; count < NR_syscalls + 1; count++){
+	for(int count=0; count < NR_syscalls + 1; count++){
 		//initializing syscall values
 		table[count].intercepted = defaultValue;
 		table[count].monitored = defaultValue;
@@ -555,7 +555,7 @@ static void exit_function(void)
 	spin_lock(&calltable_lock);
 	//need to loop through each syscall and de intercept any intercepted calls
 	//int count = 0;
-	for(count = 0; count<NR_syscalls+1; count++){
+	for(int count = 0; count<NR_syscalls+1; count++){
 		//call mysyscall to release the intercepted systemcall
 		if(table[count].intercepted == 1){
 			my_syscall(REQUEST_SYSCALL_RELEASE, count, current->pid);
