@@ -345,146 +345,146 @@ asmlinkage long interceptor(struct pt_regs reg) {
  *   to the system call table and the lists of monitored pids. Be careful to unlock any spinlocks 
  *   you might be holding, before you exit the function (including error cases!).  
  */
-asmlinkage long my_syscall(int cmd, int syscall, int pid) {
-	if (0 <= syscall < NR_syscalls + 1 && syscall != MY_CUSTOM_SYSCALL){
-		if (cmd = REQUEST_SYSCALL_INTERCEPT){
-			//check if the user isn't root
-			if (current_uid() != 0){
-				//raise -EPERM for none root users!
-				return -EPERM;
-			}
-			//can't intercept an already intercepted syscall
-			//return -Ebusy error for already intercepted syscall
-			if(calltable_lock == TRUE){
-				return -EBUSY;
-			}
-			//use synchronization to moderate syscall commands
-			aquire(calltable_lock);
-			//we can't stop monitoring a pid until we intercept that pid's system call
-			//release the pid lock only after we've intercepted
-			release(pidlist_lock);
-			//allow for us to make changes to the table
-			set_addr_rw(unsigned long sys_call_table);
-			//indicating the syscall has been intercepted
-			table[syscall].intercepted = 1;
-			//using our table to intercept the syscall, changing table to writable
-			table[syscall] == sys_call_table[syscall];
-			sys_call_table[syscall] = interceptor;
-			//restoring syscall table to read only
-			set_addr_ro(unsigned long sys_call_table);
-			release(calltable_lock);
+// asmlinkage long my_syscall(int cmd, int syscall, int pid) {
+// 	if (0 <= syscall < NR_syscalls + 1 && syscall != MY_CUSTOM_SYSCALL){
+// 		if (cmd = REQUEST_SYSCALL_INTERCEPT){
+// 			//check if the user isn't root
+// 			if (current_uid() != 0){
+// 				//raise -EPERM for none root users!
+// 				return -EPERM;
+// 			}
+// 			//can't intercept an already intercepted syscall
+// 			//return -Ebusy error for already intercepted syscall
+// 			if(calltable_lock == TRUE){
+// 				return -EBUSY;
+// 			}
+// 			//use synchronization to moderate syscall commands
+// 			aquire(calltable_lock);
+// 			//we can't stop monitoring a pid until we intercept that pid's system call
+// 			//release the pid lock only after we've intercepted
+// 			release(pidlist_lock);
+// 			//allow for us to make changes to the table
+// 			set_addr_rw(unsigned long sys_call_table);
+// 			//indicating the syscall has been intercepted
+// 			table[syscall].intercepted = 1;
+// 			//using our table to intercept the syscall, changing table to writable
+// 			table[syscall] == sys_call_table[syscall];
+// 			sys_call_table[syscall] = interceptor;
+// 			//restoring syscall table to read only
+// 			set_addr_ro(unsigned long sys_call_table);
+// 			release(calltable_lock);
 
-		}
-
-
-		if (cmd = REQUEST_SYSCALL_RELEASE){
-			//cannot de-intercept a command which hasn't been intercepted yet
-			//return -EINVAL error because we are trying to de-intercept before intercepting
-			if (calltable_lock == TRUE){
-				return -EINVAL;
-			}
-			//de-intercept the intercepted code
-			//use synchronization to moderate syscall commands
-			aquire(calltable_lock);
-			//lock the pidlist whenever the syscall isn't intercepted
-			aquire(pidlist_lock);
-			//allow for us to make changes to the table
-			set_addr_rw(unsigned long sys_call_table);
-			//deintercept indicated by 0
-			table[syscall].intercepted = 0;
-			//using our table to intercept the syscall, changing table to writable
-			table[syscall] == sys_call_table[syscall];
-			sys_call_table[syscall] = interceptor;
-			//restoring syscall table to read only
-			set_addr_ro(unsigned long sys_call_table);
-			release(calltable_lock);
-		}
+// 		}
 
 
+// 		if (cmd = REQUEST_SYSCALL_RELEASE){
+// 			//cannot de-intercept a command which hasn't been intercepted yet
+// 			//return -EINVAL error because we are trying to de-intercept before intercepting
+// 			if (calltable_lock == TRUE){
+// 				return -EINVAL;
+// 			}
+// 			//de-intercept the intercepted code
+// 			//use synchronization to moderate syscall commands
+// 			aquire(calltable_lock);
+// 			//lock the pidlist whenever the syscall isn't intercepted
+// 			aquire(pidlist_lock);
+// 			//allow for us to make changes to the table
+// 			set_addr_rw(unsigned long sys_call_table);
+// 			//deintercept indicated by 0
+// 			table[syscall].intercepted = 0;
+// 			//using our table to intercept the syscall, changing table to writable
+// 			table[syscall] == sys_call_table[syscall];
+// 			sys_call_table[syscall] = interceptor;
+// 			//restoring syscall table to read only
+// 			set_addr_ro(unsigned long sys_call_table);
+// 			release(calltable_lock);
+// 		}
 
 
 
-		if (cmd = REQUEST_START_MONITORING){
-			//check if the calling process is root or if the pid is owned by the calling process
-			//or if pid=0 user must be root
-			//raise EPERM error for denied permissions
-			if ((current_uid() != 0)  || check_pid_from_list(current->pid, pid)) {
-				return -EPERM;
-			}
-			//pid value can't be negative
-			//if its not negative it must be 0 or greater making it valid assuming it exist
-			//if it doesn't exist check if pid is 0
-			//Raise EINVAL error for invalid parameters
-			if ((pid < 0 && pid_task(find_vpid(pid), PIDTYPE_PID) == NULL) || (pid != 0)){
-				return -EINVAL;
-			}
-			//can't monitor a pid that's already being monitored
-			//return -ebusy error for pid already being monitored
-			if(check_pid_monitored(syscall, pid) == 1){
-				return -EBUSY;
-			}
-		}
-		if (cmd = REQUEST_STOP_MONITORING){
-			//if the current user isn't root or the pid isn't owned by the syscall
-			//raise EPERM error for denied permissions
-			// if ((current_uid() != 0) || check_pid_from_list(current->pid, pid)) {
-			// 	return -EPERM;
-			// }
-			// //pid value can't be negative
-			// //if its not negative it must be 0 or greater making it valid assuming it exist
-			// //if it doesn't exist check if pid is 0
-			// //Raise EINVAL error for invalid parameters
-			// if ((pid < 0 && pid_task(find_vpid(pid), PIDTYPE_PID) == NULL) || (pid != 0)) {
-			// 	return -EINVAL;
-			// }
-			// //if the lock is on then the syscall has been intercepted 
-			// //also check if pid is already being monitored
-			// //we can't stop monitoring a pid that isn't being monitor or pids of a syscall that isn't intercepted
-			// //return -EINVAL error because we are trying to de-intercept a command which hasn't been intercepted yet
-			// if ((calltable_lock == True ) || check_pid_from_list(current->pid, pid)) {
-			// 	return -EBUSY;
-			// }
-			if (current_uid() == 0) {
-				;
-			}
-			// If curr_id != 0, we need to check if the pid requested is called by the owning process
-			else {
-				// Case if pid = 0 and we aren't root OR if pid is not owned 
-				if (pid == 0 )
-					return -EPERM
-				// If this func call throws an -EPERM, this whole thing doesn't run right?
-				int caller_owns_pid = check_pid_from_list(current->pid, pid)
-				if (caller_owns_pid == 0){
-					;
-				}
-				else {
-					return -EPERM
-				}
-			}
 
-			//Checks for context - PART C only needed in request stop monitoring
-			// Checks for pid already being monitored - PART D
-			if (check_pid_monitored(syscall, pid) == 1) {
-				return -EBUSY;
-			}
 
-			// NEED TO UNLOCK ACCESS TO MYTABLE
+// 		if (cmd = REQUEST_START_MONITORING){
+// 			//check if the calling process is root or if the pid is owned by the calling process
+// 			//or if pid=0 user must be root
+// 			//raise EPERM error for denied permissions
+// 			if ((current_uid() != 0)  || check_pid_from_list(current->pid, pid)) {
+// 				return -EPERM;
+// 			}
+// 			//pid value can't be negative
+// 			//if its not negative it must be 0 or greater making it valid assuming it exist
+// 			//if it doesn't exist check if pid is 0
+// 			//Raise EINVAL error for invalid parameters
+// 			if ((pid < 0 && pid_task(find_vpid(pid), PIDTYPE_PID) == NULL) || (pid != 0)){
+// 				return -EINVAL;
+// 			}
+// 			//can't monitor a pid that's already being monitored
+// 			//return -ebusy error for pid already being monitored
+// 			if(check_pid_monitored(syscall, pid) == 1){
+// 				return -EBUSY;
+// 			}
+// 		}
+// 		if (cmd = REQUEST_STOP_MONITORING){
+// 			//if the current user isn't root or the pid isn't owned by the syscall
+// 			//raise EPERM error for denied permissions
+// 			// if ((current_uid() != 0) || check_pid_from_list(current->pid, pid)) {
+// 			// 	return -EPERM;
+// 			// }
+// 			// //pid value can't be negative
+// 			// //if its not negative it must be 0 or greater making it valid assuming it exist
+// 			// //if it doesn't exist check if pid is 0
+// 			// //Raise EINVAL error for invalid parameters
+// 			// if ((pid < 0 && pid_task(find_vpid(pid), PIDTYPE_PID) == NULL) || (pid != 0)) {
+// 			// 	return -EINVAL;
+// 			// }
+// 			// //if the lock is on then the syscall has been intercepted 
+// 			// //also check if pid is already being monitored
+// 			// //we can't stop monitoring a pid that isn't being monitor or pids of a syscall that isn't intercepted
+// 			// //return -EINVAL error because we are trying to de-intercept a command which hasn't been intercepted yet
+// 			// if ((calltable_lock == True ) || check_pid_from_list(current->pid, pid)) {
+// 			// 	return -EBUSY;
+// 			// }
+// 			if (current_uid() == 0) {
+// 				;
+// 			}
+// 			// If curr_id != 0, we need to check if the pid requested is called by the owning process
+// 			else {
+// 				// Case if pid = 0 and we aren't root OR if pid is not owned 
+// 				if (pid == 0 )
+// 					return -EPERM
+// 				// If this func call throws an -EPERM, this whole thing doesn't run right?
+// 				int caller_owns_pid = check_pid_from_list(current->pid, pid)
+// 				if (caller_owns_pid == 0){
+// 					;
+// 				}
+// 				else {
+// 					return -EPERM
+// 				}
+// 			}
+
+// 			//Checks for context - PART C only needed in request stop monitoring
+// 			// Checks for pid already being monitored - PART D
+// 			if (check_pid_monitored(syscall, pid) == 1) {
+// 				return -EBUSY;
+// 			}
+
+// 			// NEED TO UNLOCK ACCESS TO MYTABLE
 			
-			// check if PID is already monitored
-			// WTF are we supposed to return??
-			if (check_pid_monitored(syscall, pid)==1) {
-				// return something return ;
-			}
-			else {
-			// If it isn't already being monitored, add to pid list for specific syscall
-				add_pid_sysc(pid, syscall);
-				// return something ; 
-			}
+// 			// check if PID is already monitored
+// 			// WTF are we supposed to return??
+// 			if (check_pid_monitored(syscall, pid)==1) {
+// 				// return something return ;
+// 			}
+// 			else {
+// 			// If it isn't already being monitored, add to pid list for specific syscall
+// 				add_pid_sysc(pid, syscall);
+// 				// return something ; 
+// 			}
 
-			// NEED TO LOCK ACCESS TO MYTABLE
-		}
-	}
-}
+// 			// NEED TO LOCK ACCESS TO MYTABLE
+// 		}
+// 	}
+// }
 
 /**
  *
