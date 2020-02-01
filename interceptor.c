@@ -508,8 +508,17 @@ static int init_function(void) {
  */
 static void exit_function(void)
 {
+
 	//implement locks!!!
 	spin_lock(&calltable_lock);
+	//need to loop through each syscall and de intercept any intercepted calls
+	int count;
+	for(count =0 ; count<NR_syscalls+1; count++){
+		//call mysyscall to release the intercepted systemcall
+		if(table[count].intercepted] == 1){
+			mysyscall(REQUEST_SYSCALL_RELEASE, count, current->pid);
+		}
+	}
 	//making system call table writable
 	set_addr_rw((unsigned long) sys_call_table);
 	//restoring the original values of the syscall table that were stored in
