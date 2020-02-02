@@ -415,6 +415,39 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 			if(pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
 				return -EINVAL;
 			}
+
+			if (current_uid() == 0) {
+				// if (pid==0){
+				// 	int ct = 1;
+				// 	while (ct < NR_syscalls+1){
+
+				// 	}
+				// }
+			}
+
+			// If user isn't root we need to check if they own the process
+			else {
+				// Maybe throw case here if pid = 0?
+
+				// If this func call throws an -EPERM, this whole thing doesn't run right?
+				int caller_owns_pid = check_pid_from_list(current->pid, pid)
+				if (caller_owns_pid != 0){
+					return -EPERM;
+				}
+			}
+
+			// Check if pid is already being monitored for specific system call
+			if (check_pid_monitored(syscall, pid) == 1) {
+				return -EBUSY;
+			}
+
+			else {
+				// Need to unlock pid list
+				// If it isn't already being monitored, add to pid list for specific syscall
+				add_pid_sysc(pid, syscall);
+				// return something ;
+				return 0;
+			}
 			
 		}
 		
