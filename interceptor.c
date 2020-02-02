@@ -515,8 +515,7 @@ static int init_function(void) {
 	int defaultValue = 0;
 	//initialized list
 	int count;
-	struct pid_list some_list
-	INIT_LIST_HEAD (&some_list); 
+	 
 	//save the original values of MY_CUSTOM_SYSCALL and __NR_exit_group (aka Hijack MY CUSTOM SYSCALL)
 	orig_custom_syscall = sys_call_table[MY_CUSTOM_SYSCALL];
 	orig_exit_group = sys_call_table[__NR_exit_group];
@@ -532,7 +531,8 @@ static int init_function(void) {
 		table[count].intercepted = defaultValue;
 		table[count].monitored = defaultValue;
 		table[count].listcount = defaultValue;
-				
+		INIT_LIST_HEAD (&(table[count].my_list));
+
 	}
 	//setting system call table back to read only
 	set_addr_ro((unsigned long) sys_call_table);
