@@ -425,7 +425,10 @@ static int init_function(void) {
 	//initialize the list 
 	//int count = 0;
 	// default system values 
-	
+	// writing to the sys call table
+	sys_call_table[MY_CUSTOM_SYSCALL] = my_syscall;
+    sys_call_table[__NR_exit_group] = my_exit_group;
+
 	for(count=0; count < NR_syscalls + 1; count++){
 		//initializing syscall values
 		table[count].intercepted = defaultValue;
