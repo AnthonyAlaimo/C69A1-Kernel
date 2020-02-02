@@ -402,6 +402,26 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 			set_addr_ro((unsigned long) sys_call_table);
 			spin_unlock(&calltable_lock);
 		}
+		if(cmd == REQUEST_START_MONITORING){
+			if(pid < 0){
+				return -EINVAL;
+			}
+			
+			if(pid == 0){
+				// start monitoring for all PID's
+					
+			}
+			
+			if(pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
+				return -EINVAL;
+			}
+			
+		}
+		
+		
+		
+		
+		
 		return 0;
 	}
 	
