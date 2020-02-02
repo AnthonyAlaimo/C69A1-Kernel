@@ -11,7 +11,7 @@
 #include <linux/syscalls.h>
 #include "interceptor.h"
 
-//AABC
+//Swag
 MODULE_DESCRIPTION("My kernel module");
 MODULE_AUTHOR("Me");
 MODULE_LICENSE("GPL");
@@ -349,7 +349,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 	
 	// Part A
 	if ((0 <= syscall) && (syscall < NR_syscalls + 1) && (syscall != MY_CUSTOM_SYSCALL)){
-		
+		//INTERCEPT COMMAND
 		if (cmd == REQUEST_SYSCALL_INTERCEPT){
 			
 			// Checking if root is user
@@ -377,8 +377,32 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 
 			spin_unlock(&calltable_lock);
 			//LOCKS!!!
-			return 0;
 		}
+		//DEINTERCEPT COMMAND
+		if (cmd == REQUEST_SYSCALL_RELEASE){
+			// Checking if root is user
+			if (current_uid() != 0){
+				return -EPERM;
+			}
+			//cannot de-intercept a command which hasn't been intercepted yet
+			//return -EINVAL error because we are trying to de-intercept before intercepting
+			if (table[syscall].intercepted != 1){
+				return -EINVAL;
+			}
+			//de-intercept the intercepted code
+			//use synchronization to moderate syscall commands
+			spin_lock(&calltable_lock);
+			//deintercept indicated by 0
+			table[syscall].intercepted = 0;
+			//allow for us to make changes to the table
+			set_addr_rw((unsigned long) sys_call_table);
+			//restoring the old system call table to it's original position
+			sys_call_table[syscall] = table[syscall].f;
+			//restoring syscall table to read only
+			set_addr_ro((unsigned long) sys_call_table);
+			spin_unlock(&calltable_lock);
+		}
+		return 0;
 	}
 	
 	// Value error (checking inputs)
