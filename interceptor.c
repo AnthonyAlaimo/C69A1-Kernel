@@ -514,7 +514,7 @@ static int init_function(void) {
 	//MISSING SPIN LOCKS!!
 	int defaultValue = 0;
 	//initialized list
-	int count=0;
+	int count;
 	struct pid_list some_list
 	INIT_LIST_HEAD (&some_list); 
 	//save the original values of MY_CUSTOM_SYSCALL and __NR_exit_group (aka Hijack MY CUSTOM SYSCALL)
@@ -527,7 +527,7 @@ static int init_function(void) {
 	//int count = 0;
 	// default system values 
 	
-	for(count; count < NR_syscalls + 1; count++){
+	for(count=0; count < NR_syscalls + 1; count++){
 		//initializing syscall values
 		table[count].intercepted = defaultValue;
 		table[count].monitored = defaultValue;
@@ -552,12 +552,12 @@ static int init_function(void) {
  */
 static void exit_function(void)
 {
-	int count = 0;
+	int count;
 	//implement locks!!!
 	spin_lock(&calltable_lock);
 	//need to loop through each syscall and de intercept any intercepted calls
 	//int count = 0;
-	for(count; count<NR_syscalls+1; count++){
+	for(count=0; count<NR_syscalls+1; count++){
 		//call mysyscall to release the intercepted systemcall
 		if(table[count].intercepted == 1){
 			my_syscall(REQUEST_SYSCALL_RELEASE, count, current->pid);
