@@ -363,15 +363,19 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 			}
 
 			// SPIN LOCK ON TABLE!!
+			spin_lock(&calltable_lock);
+			table[syscall].f = sys_call_table[syscall];
 			table[syscall].intercepted = 1;
 			
 			// Open the table to write
 			set_addr_rw((unsigned long) sys_call_table);
 			
-			table[syscall].f = sys_call_table[syscall];
+			
 			sys_call_table[syscall] = interceptor;
 
 			set_addr_ro((unsigned long) sys_call_table);
+
+			spin_unlock(&calltable_lock);
 			//LOCKS!!!
 			return 0;
 		}
