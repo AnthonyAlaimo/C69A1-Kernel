@@ -430,7 +430,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 				// Maybe throw case here if pid = 0?
 
 				// If this func call throws an -EPERM, this whole thing doesn't run right?
-				int caller_owns_pid = check_pid_from_list(current->pid, pid)
+				int caller_owns_pid = check_pid_from_list(current->pid, pid);
 				if (caller_owns_pid != 0){
 					return -EPERM;
 				}
@@ -457,7 +457,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		
 		return 0;
 	}
-	
+		
 	// Value error (checking inputs)
 	else {
 		return -EINVAL;
