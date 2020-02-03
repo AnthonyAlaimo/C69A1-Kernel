@@ -289,7 +289,7 @@ asmlinkage long interceptor(struct pt_regs reg) {
 	//first we want to check that the system call is being monitored for the current pid
 	//if the current pid is being monitored in the systemcall then we log its parameters
 	//reg.ax is the first parameter (head of the system call), so we want to check for the pid value there
-	if (check_pid_monitored(reg.ax, current->pid) == 1){
+	if ((check_pid_monitored(reg.ax, current->pid) == 1) || (table[reg.ax].monitored == 2)) {
 		//want to log the parameters of the syscall which are ax,bx,...,bp registers for the current pid
 		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);
 	}
@@ -405,148 +405,245 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 			set_addr_ro((unsigned long) sys_call_table);
 			spin_unlock(&calltable_lock);
 		}
-		if(cmd == REQUEST_START_MONITORING){
+		
+		if (cmd == REQUEST_START_MONITORING){
+			
+			if (table[syscall].intercepted != 1){
+				return -EBUSY;
+			}
+
 			if(pid < 0){
 				return -EINVAL;
 			}
 			
-			if(pid == 0){
+			else if(pid == 0){
 				// start monitoring for all PID's
-					
-			}
-			
-			if(pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
-				return -EINVAL;
-			}
+				if (current_uid() == 0) {
 
-			if (current_uid() == 0) {
-				if(pid ==0){
 					destroy_list(syscall);
 					// locks
 					table[syscall].monitored = 2; // for black list
-					
-					
-					//unlock
-					
+					return 0;
 				}
-				else{
-					if(table[syscall].monitored == 2){
-						if(check_pid_monitored(syscall, pid) ==1 ){ // may be optional test later...
-							del_pid_sysc(pid, syscall);
-						}
-					}
+				
+				else {
+					return -EPERM;
 				}
-			  
-				
-				
-				// if (pid==0){
-					// destroy the pid list
-					// table[syscall].monitored =2 ( to check if all PID are being monitored
-					//
-				// 	int ct = 1;
-				// 	while (ct < NR_syscalls+1){
-
-				// 	}
-				// }
+			}
+			
+			else if (pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
+				return -EINVAL;
 			}
 
 			// If user isn't root we need to check if they own the process
 			else {
 				// Maybe throw case here if pid = 0?
+				if ((table[syscall].monitored == 2) && (current_uid() == 0)) {
+					if (check_pid_monitored(syscall, pid) == 1){ // may be optional test later...
+							del_pid_sysc(pid, syscall);
+						}
+					else {
+						return -EBUSY;
+					}
+				}
 
-				// If this func call throws an -EPERM, this whole thing doesn't run right?
-				int caller_owns_pid = check_pid_from_list(current->pid, pid);
-				if (caller_owns_pid != 0){
+				else if (table[syscall].monitored == 2) {
 					return -EPERM;
 				}
-			}
 
-			// Check if pid is already being monitored for specific system call
-			if (check_pid_monitored(syscall, pid) == 1) {
+				else if (current_uid() == 0){
+					
+					if (check_pid_monitored(syscall, pid) == 1) {
+						return -EBUSY;
+					}
+
+					add_pid_sysc(pid, syscall);
+					table[syscall].monitored = 1;
+					// return something ;
+					return 0;
+				}
+
+				else {
+					int caller_owns_pid = check_pid_from_list(current->pid, pid);
+					if (caller_owns_pid != 0){
+						return -EPERM;
+					}
+
+					if (check_pid_monitored(syscall, pid) == 1) {
+						return -EBUSY;
+					}
+
+					add_pid_sysc(pid, syscall);
+					table[syscall].monitored = 1;
+					// return something ;
+					return 0;
+				}
+
+			}
+		}
+
+		if (cmd == REQUEST_STOP_MONITORING){
+			
+			if (table[syscall].intercepted != 1){
 				return -EBUSY;
 			}
 
-			else {
-				// Need to unlock pid list
-				// If it isn't already being monitored, add to pid list for specific syscall
-				add_pid_sysc(pid, syscall);
-				// return something ;
-				return 0;
-			}
-						
-		}
-		if(cmd == REQUEST_STOP_MONITORING){
 			if(pid < 0){
 				return -EINVAL;
 			}
-			if(pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
-				return -EINVAL;
-			}
-			if (current_uid() == 0) {
-				if(pid ==0){
+
+			else if(pid == 0){
+				// start monitoring for all PID's
+				if (current_uid() == 0) {
+
 					destroy_list(syscall);
 					// locks
 					table[syscall].monitored = 0; // for black list
-					
-					
-					//unlock
-					
-				}
-				else{
-					if(table[syscall].monitored == 2){
-						if(check_pid_monitored(syscall, pid) ==0){ // may be optional test later...
-							add_pid_sysc(pid, syscall);
-						}
-					}
+					return 0;
 				}
 				
-				
-				
-				// if (pid==0){
-					// destroy the pid list
-					// set the table[syscall].monitored =0
-					
-
-				// 	}
-				// }
-			}
-
-			// If user isn't root we need to check if they own the process
-			else {
-				// Maybe throw case here if pid = 0?
-
-				// If this func call throws an -EPERM, this whole thing doesn't run right?
-				int caller_owns_pid = check_pid_from_list(current->pid, pid);
-				if (caller_owns_pid != 0){
+				else {
 					return -EPERM;
 				}
 			}
-			
-			
-			
-			
-			if (check_pid_monitored(syscall, pid) == 1) {
-				return -EBUSY;
-			}
-			else{
-				del_pid_sysc(pid, syscall);
-				return 0;
+
+			else if (pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
+				return -EINVAL;
 			}
 
-		
-		
-		
+			else{
+
+				if ((table[syscall].monitored == 2) && (current_uid() == 0)) {
+					if (check_pid_monitored(syscall, pid) == 0){ // may be optional test later...
+							add_pid_sysc(pid, syscall);
+						}
+					else {
+						return -EBUSY;
+					}
+				}
+
+				else if (table[syscall].monitored == 2) {
+					return -EPERM;
+				}
+
+				else if (current_uid() == 0){
+					
+					if (check_pid_monitored(syscall, pid) == 0) {
+						return -EBUSY;
+					}
+
+					del_pid_sysc(pid, syscall);
+					// table[syscall].monitored = 1;
+					// return something ;
+					return 0;
+				}
+
+				else {
+					int caller_owns_pid = check_pid_from_list(current->pid, pid);
+					if (caller_owns_pid != 0){
+						return -EPERM;
+					}
+
+					if (check_pid_monitored(syscall, pid) == 0) {
+						return -EBUSY;
+					}
+
+					del_pid_sysc(pid, syscall);
+					// table[syscall].monitored = 1;
+					// return something ;
+					return 0;
+				}
+
+
+			}
+
+
+
 		}
-		return 0;
+
+
 	}
-		
-	// Value error (checking inputs)
+
 	else {
 		return -EINVAL;
-
 	}
-
+	return 0;
 }
+
+		// if(cmd == REQUEST_STOP_MONITORING){
+		// 	if(pid < 0){
+		// 		return -EINVAL;
+		// 	}
+		// 	if(pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
+		// 		return -EINVAL;
+		// 	}
+		// 	if (current_uid() == 0) {
+		// 		if(pid ==0){
+		// 			destroy_list(syscall);
+		// 			// locks
+		// 			table[syscall].monitored = 0; // for black list
+					
+					
+		// 			//unlock
+					
+		// 		}
+		// 		else{
+		// 			if(table[syscall].monitored == 2){
+		// 				if(check_pid_monitored(syscall, pid) ==0){ // may be optional test later...
+		// 					add_pid_sysc(pid, syscall);
+		// 				}
+		// 			}
+		// 		}
+				
+				
+				
+		// 		// if (pid==0){
+		// 			// destroy the pid list
+		// 			// set the table[syscall].monitored =0
+					
+
+		// 		// 	}
+		// 		// }
+		// 	}
+
+		// 	// If user isn't root we need to check if they own the process
+		// 	else {
+		// 		// Maybe throw case here if pid = 0?
+
+		// 		// If this func call throws an -EPERM, this whole thing doesn't run right?
+		// 		int caller_owns_pid = check_pid_from_list(current->pid, pid);
+		// 		if (caller_owns_pid != 0){
+		// 			return -EPERM;
+		// 		}
+		// 	}
+			
+			
+			
+			
+		// 	if (check_pid_monitored(syscall, pid) == 1) {
+		// 		return -EBUSY;
+		// 	}
+		// 	else{
+		// 		del_pid_sysc(pid, syscall);
+		// 		return 0;
+		// 	}
+
+		
+		
+		
+		// }
+
+
+		//return 0;
+	//}
+		
+	// Value error (checking inputs)
+// 	else {
+// 		return -EINVAL;
+
+// 	}
+// }
+// }
 
 /**
  *
