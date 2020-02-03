@@ -388,7 +388,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 			//return -EINVAL error because we are trying to de-intercept before intercepting
 			if (table[syscall].intercepted != 1){
 				return -EINVAL;
-			}
+			} 
 			//de-intercept the intercepted code
 			//use synchronization to moderate syscall commands
 			spin_lock(&calltable_lock);
@@ -541,6 +541,7 @@ static void exit_function(void)
 		//call mysyscall to release the intercepted systemcall
 		if(table[count].intercepted == 1){
 			my_syscall(REQUEST_SYSCALL_RELEASE, count, current->pid);
+			destroy_list(count);
 		}
 	}
 	//making system call table writable
