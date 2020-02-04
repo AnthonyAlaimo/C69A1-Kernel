@@ -785,7 +785,7 @@ static void exit_function(void)
 	//setting system call table back to read only
 	set_addr_ro((unsigned long) sys_call_table);
 	spin_unlock(&calltable_lock);
-	return 0;
+	//return 0;
 
 }
 
