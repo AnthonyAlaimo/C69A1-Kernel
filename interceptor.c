@@ -412,46 +412,62 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		}
 		
 		if (cmd == REQUEST_START_MONITORING){
+			
+			// If syscall is not already intercepted
 			if (table[syscall].intercepted != 1){
 				return -EBUSY;
 			}
 
+			// If pid < 0
 			if(pid < 0){
 				return -EINVAL;
 			}
 			
+			// If we wanna monitor all pids
 			else if(pid == 0){
-				// start monitoring for all PID's
+				// start monitoring for all PID's iff root
 				if (current_uid() == 0) {
 
+					// destroy list because we now maintaining a blacklist
 					destroy_list(syscall);
 					// locks
 					table[syscall].monitored = 2; // for black list
 					return 0;
 				}
 				
+				// If not root, permissions error
 				else {
 					return -EPERM;
 				}
 			}
 			
+			// If pid invalid, return invalid error
 			else if (pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
 				return -EINVAL;
 			}
 
-			// If user isn't root we need to check if they own the process
+			// If pid a regular singular one
 			else {
-				// Maybe throw case here if pid = 0?
+				// If we maintaing a blacklist and we root
 				if ((table[syscall].monitored == 2) && (current_uid() == 0)) {
+					
+					// Check if pid in the blacklist (meaning we aren't monitoring it)
+					// If it is we remove it
 					if (check_pid_monitored(syscall, pid) == 1){ // may be optional test later...
 							del_pid_sysc(pid, syscall);
 						}
+					// If not in blacklist throw error
 					else {
 						return -EBUSY;
 					}
 				}
 
+				// If we have blacklist enabled, but we aren't root
 				else if (table[syscall].monitored == 2) {
+					
+					// Need to see if caller owns the pid, if yes we can remove it from the blacklist
+					// (we can start monitoring it)
+
 					int caller_owns_pid = check_pid_from_list(current->pid, pid);
 					if (caller_owns_pid != 0){
 						return -EPERM;
@@ -460,11 +476,18 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					return 0;
 				}
 
+				// If we don't have blacklist enabled, but we are root
 				else if (current_uid() == 0){
 					
+					// Check if pid already in list
 					if (check_pid_monitored(syscall, pid) == 1) {
 						return -EBUSY;
 					}
+
+					// Locks
+
+					// If table of monitored pids is empty, change monitored to 1 because we
+					// adding a pid
 
 					if (table[syscall].listcount == 0){
 						table[syscall].monitored = 1;
@@ -477,7 +500,9 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					return 0;
 				}
 
+				// If we not root and not blacklist
 				else {
+					// Check if caller owns the process, if so we can proceed
 					int caller_owns_pid = check_pid_from_list(current->pid, pid);
 					if (caller_owns_pid != 0){
 						return -EPERM;
@@ -487,6 +512,8 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 						return -EBUSY;
 					}
 
+					// If table of monitored pids is empty, change monitored to 1 because we
+					// adding a pid
 					if (table[syscall].listcount == 0){
 						table[syscall].monitored = 1;
 					}
@@ -501,19 +528,25 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 
 		if (cmd == REQUEST_STOP_MONITORING){
 			
+			// If the syscall isn;'t intercepted we done here
 			if (table[syscall].intercepted != 1){
 				return -EBUSY;
 			}
+			
+			// If pid is less than 0 it isn't a valid pid
 			if(pid < 0){
 				return -EINVAL;
 			}
 
+			// If pid is 0, we want to stop monitoring all pids for specific syscall
 			else if(pid == 0){
-				// start monitoring for all PID's
+				// if root, we can proceed
 				if (current_uid() == 0) {
 
+					// Destroy the black list
 					destroy_list(syscall);
 					// locks
+					// Turn list back into normal pid list
 					table[syscall].monitored = 0; // for black list
 					return 0;
 				}
@@ -523,41 +556,60 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 				}
 			}
 
+			// If pid is invalid, return error
 			else if (pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
 				return -EINVAL;
 			}
 
+			// If pid is normal functional pid
 			else{
 
+				// If blacklist and we root
 				if ((table[syscall].monitored == 2) && (current_uid() == 0)) {
+					
+					// If pid not in blacklist, add it to stop it being monitored
 					if (check_pid_monitored(syscall, pid) == 0){ // may be optional test later...
 							add_pid_sysc(pid, syscall);
 						}
+					
+					// If pid already in blacklist, return error
 					else {
 						return -EBUSY;
 					}
 				}
 
+				// If blacklist and we not root
 				else if (table[syscall].monitored == 2) {
-					//return -EPERM;
+					
+					// see if we own calling process
 					int caller_owns_pid = check_pid_from_list(current->pid, pid);
 					if (caller_owns_pid != 0){
 						return -EPERM;
 					}
+
+					// if we own calling process, can add pid to black list
+					//locks
 					add_pid_sysc(pid, syscall);
 					return 0;
 				}
 
+				// If we root, but pid already monitored, return ebusy
 				else if ((current_uid() == 0) && (check_pid_monitored(syscall, pid) == 0)){
 					return -EBUSY;
 				}
+				
+				// If we just root
 				else if (current_uid() == 0){
 					
-					// check if pid list is empty
+					// check if syscall is monitored
 					if (table[syscall].monitored == 0){
 						return -EINVAL;
 					}
+
+					// If it isn't we can del the pid
 					del_pid_sysc(pid, syscall);
+					
+					// If list count of pid list is 0, we aren't monitoring anything anymore
 					if (table[syscall].listcount == 0){
 						table[syscall].monitored = 0;
 					}
@@ -565,15 +617,22 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					return 0;
 				}
 
+				// We aren't root
 				else {
+					// Check if the caller owns the pid
 					int caller_owns_pid = check_pid_from_list(current->pid, pid);
+					
+					// If caller doesn't throw permission error
 					if (caller_owns_pid != 0){
 						return -EPERM;
 					}
+					
+					// If we aren't monitoring this syscall, throw an error
 					if (table[syscall].monitored == 0){
 						return -EINVAL;
 					}
 
+					// Now we're free to delete the pid
 					del_pid_sysc(pid, syscall);
 					// check if pid list is empty
 					if (table[syscall].listcount == 0){
@@ -593,6 +652,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 
 	}
 
+	// If invalid value, return einval
 	else {
 		return -EINVAL;
 	}
