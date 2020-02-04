@@ -510,8 +510,10 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					}
 					//table[syscall].monitored = 1;
 					spin_lock(&pidlist_lock);
-
-					add_pid_sysc(pid, syscall);
+					//checking for memory issues with pid list
+					if (add_pid_sysc(pid, syscall) != 0){
+						return -ENOMEM;
+					}
 
 					spin_unlock(&pidlist_lock);
 					// add_pid_sysc(pid, syscall);
@@ -539,8 +541,10 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					}
 					//table[syscall].monitored = 1;
 					spin_lock(&pidlist_lock);
-
-					add_pid_sysc(pid, syscall);
+					//checking for memory issues with pid list
+					if (add_pid_sysc(pid, syscall) != 0){
+						return -ENOMEM;
+					}
 
 					spin_unlock(&pidlist_lock);
 					// return something ;
@@ -596,8 +600,10 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					if (check_pid_monitored(syscall, pid) == 0){ // may be optional test later...
 							
 							spin_lock(&pidlist_lock);
-
-							add_pid_sysc(pid, syscall);
+							//checking for memory issues with pid list
+							if (add_pid_sysc(pid, syscall) != 0){
+								return -ENOMEM;
+							}
 
 							spin_unlock(&pidlist_lock);
 						}
@@ -620,7 +626,11 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					// if we own calling process, can add pid to black list
 					//locks
 					spin_lock(&pidlist_lock);
-					add_pid_sysc(pid, syscall);
+					//checking for memory issues with pid list
+					if (add_pid_sysc(pid, syscall) != 0){
+						return -ENOMEM;
+					}
+
 					spin_unlock(&pidlist_lock);
 					return 0;
 				}
