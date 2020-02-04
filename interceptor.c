@@ -429,9 +429,15 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 				if (current_uid() == 0) {
 
 					// destroy list because we now maintaining a blacklist
+					spin_lock(&pidlist_lock);
+					
 					destroy_list(syscall);
+
+					spin_unlock(&pidlist_lock);
 					// locks
+					//spin_lock(&calltable_lock);
 					table[syscall].monitored = 2; // for black list
+					//spin_unlock(&calltable_lock);
 					return 0;
 				}
 				
@@ -454,7 +460,12 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					// Check if pid in the blacklist (meaning we aren't monitoring it)
 					// If it is we remove it
 					if (check_pid_monitored(syscall, pid) == 1){ // may be optional test later...
+							
+							spin_lock(&pidlist_lock);
+
 							del_pid_sysc(pid, syscall);
+
+							spin_unlock(&pidlist_lock);
 						}
 					// If not in blacklist throw error
 					else {
@@ -472,7 +483,12 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					if (caller_owns_pid != 0){
 						return -EPERM;
 					}
+
+					spin_lock(&pidlist_lock);
+
 					del_pid_sysc(pid, syscall);
+
+					spin_unlock(&pidlist_lock);
 					return 0;
 				}
 
@@ -493,7 +509,11 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 						table[syscall].monitored = 1;
 					}
 					//table[syscall].monitored = 1;
+					spin_lock(&pidlist_lock);
+
 					add_pid_sysc(pid, syscall);
+
+					spin_unlock(&pidlist_lock);
 					// add_pid_sysc(pid, syscall);
 					// table[syscall].monitored = 1;
 					// return something ;
@@ -518,7 +538,11 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 						table[syscall].monitored = 1;
 					}
 					//table[syscall].monitored = 1;
+					spin_lock(&pidlist_lock);
+
 					add_pid_sysc(pid, syscall);
+
+					spin_unlock(&pidlist_lock);
 					// return something ;
 					return 0;
 				}
@@ -542,10 +566,11 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 			else if(pid == 0){
 				// if root, we can proceed
 				if (current_uid() == 0) {
-
+					spin_lock(&pidlist_lock);
 					// Destroy the black list
 					destroy_list(syscall);
 					// locks
+					spin_unlock(&pidlist_lock);
 					// Turn list back into normal pid list
 					table[syscall].monitored = 0; // for black list
 					return 0;
@@ -569,7 +594,12 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					
 					// If pid not in blacklist, add it to stop it being monitored
 					if (check_pid_monitored(syscall, pid) == 0){ // may be optional test later...
+							
+							spin_lock(&pidlist_lock);
+
 							add_pid_sysc(pid, syscall);
+
+							spin_unlock(&pidlist_lock);
 						}
 					
 					// If pid already in blacklist, return error
@@ -589,7 +619,9 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 
 					// if we own calling process, can add pid to black list
 					//locks
+					spin_lock(&pidlist_lock);
 					add_pid_sysc(pid, syscall);
+					spin_unlock(&pidlist_lock);
 					return 0;
 				}
 
@@ -607,7 +639,11 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					}
 
 					// If it isn't we can del the pid
+					spin_lock(&pidlist_lock);
+					
 					del_pid_sysc(pid, syscall);
+					
+					spin_unlock(&pidlist_lock);
 					
 					// If list count of pid list is 0, we aren't monitoring anything anymore
 					if (table[syscall].listcount == 0){
@@ -633,7 +669,11 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					}
 
 					// Now we're free to delete the pid
+					spin_lock(&pidlist_lock);
+
 					del_pid_sysc(pid, syscall);
+
+					spin_unlock(&pidlist_lock);
 					// check if pid list is empty
 					if (table[syscall].listcount == 0){
 						table[syscall].monitored = 0;
