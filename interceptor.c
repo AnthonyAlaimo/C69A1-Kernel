@@ -301,7 +301,7 @@ asmlinkage long interceptor(struct pt_regs reg) {
 	}
 
 	spin_unlock(&pidlist_lock);
-	//we need to call the original system call so processes proceed as normal
+	//return the original system call so processes proceed as normal
 	return (table[reg.ax].f(reg));
 }
 
@@ -355,8 +355,7 @@ asmlinkage long interceptor(struct pt_regs reg) {
  *   you might be holding, before you exit the function (including error cases!).  
  */
 asmlinkage long my_syscall(int cmd, int syscall, int pid) {
-	
-	// Part A
+	//General conditions for all custom commands of syscall
 	if ((0 <= syscall) && (syscall < NR_syscalls + 1) && (syscall != MY_CUSTOM_SYSCALL)){
 		//INTERCEPT COMMAND
 		if (cmd == REQUEST_SYSCALL_INTERCEPT){
@@ -372,21 +371,20 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 				return -EBUSY;
 			}
 
-			// SPIN LOCK ON TABLE!!
+			//Synchronization with the call table
 			spin_lock(&calltable_lock);
+			//store the original system call and indicate its been intercepted
 			table[syscall].f = sys_call_table[syscall];
 			table[syscall].intercepted = 1;
 			
 			// Open the table to write
 			set_addr_rw((unsigned long) sys_call_table);
 			
-			
+			//intercept the syscall
 			sys_call_table[syscall] = interceptor;
-
+			//change table back to write only
 			set_addr_ro((unsigned long) sys_call_table);
-
 			spin_unlock(&calltable_lock);
-			//LOCKS!!!
 		}
 		//DEINTERCEPT COMMAND
 		if (cmd == REQUEST_SYSCALL_RELEASE){
@@ -414,7 +412,6 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		}
 		
 		if (cmd == REQUEST_START_MONITORING){
-			
 			if (table[syscall].intercepted != 1){
 				return -EBUSY;
 			}
@@ -602,81 +599,6 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 	return 0;
 }
 
-		// if(cmd == REQUEST_STOP_MONITORING){
-		// 	if(pid < 0){
-		// 		return -EINVAL;
-		// 	}
-		// 	if(pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
-		// 		return -EINVAL;
-		// 	}
-		// 	if (current_uid() == 0) {
-		// 		if(pid ==0){
-		// 			destroy_list(syscall);
-		// 			// locks
-		// 			table[syscall].monitored = 0; // for black list
-					
-					
-		// 			//unlock
-					
-		// 		}
-		// 		else{
-		// 			if(table[syscall].monitored == 2){
-		// 				if(check_pid_monitored(syscall, pid) ==0){ // may be optional test later...
-		// 					add_pid_sysc(pid, syscall);
-		// 				}
-		// 			}
-		// 		}
-				
-				
-				
-		// 		// if (pid==0){
-		// 			// destroy the pid list
-		// 			// set the table[syscall].monitored =0
-					
-
-		// 		// 	}
-		// 		// }
-		// 	}
-
-		// 	// If user isn't root we need to check if they own the process
-		// 	else {
-		// 		// Maybe throw case here if pid = 0?
-
-		// 		// If this func call throws an -EPERM, this whole thing doesn't run right?
-		// 		int caller_owns_pid = check_pid_from_list(current->pid, pid);
-		// 		if (caller_owns_pid != 0){
-		// 			return -EPERM;
-		// 		}
-		// 	}
-			
-			
-			
-			
-		// 	if (check_pid_monitored(syscall, pid) == 1) {
-		// 		return -EBUSY;
-		// 	}
-		// 	else{
-		// 		del_pid_sysc(pid, syscall);
-		// 		return 0;
-		// 	}
-
-		
-		
-		
-		// }
-
-
-		//return 0;
-	//}
-		
-	// Value error (checking inputs)
-// 	else {
-// 		return -EINVAL;
-
-// 	}
-// }
-// }
-
 /**
  *
  */
@@ -699,7 +621,6 @@ long (*orig_custom_syscall)(void);
  * - Ensure synchronization as needed.
  */
 static int init_function(void) {
-	//MISSING SPIN LOCKS!!
 	int defaultValue = 0;
 	//initialized list
 	int count;
@@ -707,18 +628,17 @@ static int init_function(void) {
 	//save the original values of MY_CUSTOM_SYSCALL and __NR_exit_group (aka Hijack MY CUSTOM SYSCALL)
 	orig_custom_syscall = sys_call_table[MY_CUSTOM_SYSCALL];
 	orig_exit_group = sys_call_table[__NR_exit_group];
+	//synchronization
 	spin_lock(&calltable_lock);
 	//making system call table writable
 	set_addr_rw((unsigned long) sys_call_table);
-	//initialize the list 
-	//int count = 0;
 	// default system values 
 	// writing to the sys call table
 	sys_call_table[MY_CUSTOM_SYSCALL] = my_syscall;
 	sys_call_table[__NR_exit_group] = my_exit_group;
 
 	for(count=0; count < NR_syscalls + 1; count++){
-		//initializing syscall values
+		//initializing syscall values and initialize our list
 		table[count].intercepted = defaultValue;
 		table[count].monitored = defaultValue;
 		table[count].listcount = defaultValue;
@@ -744,13 +664,14 @@ static int init_function(void) {
 static void exit_function(void)
 {
 	int count;
-	//implement locks!!!
+	//synchronization
 	spin_lock(&calltable_lock);
 	//need to loop through each syscall and de intercept any intercepted calls
 	//int count = 0;
 	for(count=0; count<NR_syscalls+1; count++){
 		//call mysyscall to release the intercepted systemcall
 		if(table[count].intercepted == 1){
+			//destroy the pid list when the syscall isn't being intercepted anymore
 			my_syscall(REQUEST_SYSCALL_RELEASE, count, current->pid);
 			destroy_list(count);
 		}
