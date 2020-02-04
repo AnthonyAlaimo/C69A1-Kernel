@@ -285,14 +285,21 @@ void my_exit_group(int status)
 
 asmlinkage long interceptor(struct pt_regs reg) {
 	//FIX THE LOCKS!!
+	bool is_logged = false;
 	spin_lock(&pidlist_lock);
 	//first we want to check that the system call is being monitored for the current pid
 	//if the current pid is being monitored in the systemcall then we log its parameters
 	//reg.ax is the first parameter (head of the system call), so we want to check for the pid value there
-	if ((check_pid_monitored(reg.ax, current->pid) == 1) || (table[reg.ax].monitored == 2)) {
+	if (check_pid_monitored(reg.ax, current->pid) == 1) {
 		//want to log the parameters of the syscall which are ax,bx,...,bp registers for the current pid
 		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);
+		is_logged = true;
 	}
+
+	if ((table[reg.ax].monitored == 2) && (!is_logged)){
+		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);
+	}
+
 	spin_unlock(&pidlist_lock);
 	//we need to call the original system call so processes proceed as normal
 	return (table[reg.ax].f(reg));
@@ -448,7 +455,12 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 				}
 
 				else if (table[syscall].monitored == 2) {
-					return -EPERM;
+					int caller_owns_pid = check_pid_from_list(current->pid, pid);
+					if (caller_owns_pid != 0){
+						return -EPERM;
+					}
+					del_pid_sysc(pid, syscall);
+					return 0;
 				}
 
 				else if (current_uid() == 0){
@@ -457,8 +469,13 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 						return -EBUSY;
 					}
 
+					if (table[syscall].listcount == 0){
+						table[syscall].monitored = 1;
+					}
+					//table[syscall].monitored = 1;
 					add_pid_sysc(pid, syscall);
-					table[syscall].monitored = 1;
+					// add_pid_sysc(pid, syscall);
+					// table[syscall].monitored = 1;
 					// return something ;
 					return 0;
 				}
@@ -473,8 +490,11 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 						return -EBUSY;
 					}
 
+					if (table[syscall].listcount == 0){
+						table[syscall].monitored = 1;
+					}
+					//table[syscall].monitored = 1;
 					add_pid_sysc(pid, syscall);
-					table[syscall].monitored = 1;
 					// return something ;
 					return 0;
 				}
@@ -487,7 +507,6 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 			if (table[syscall].intercepted != 1){
 				return -EBUSY;
 			}
-
 			if(pid < 0){
 				return -EINVAL;
 			}
@@ -523,17 +542,28 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 				}
 
 				else if (table[syscall].monitored == 2) {
-					return -EPERM;
+					//return -EPERM;
+					int caller_owns_pid = check_pid_from_list(current->pid, pid);
+					if (caller_owns_pid != 0){
+						return -EPERM;
+					}
+					add_pid_sysc(pid, syscall);
+					return 0;
 				}
 
+				else if ((current_uid() == 0) && (check_pid_monitored(syscall, pid) == 0)){
+					return -EBUSY;
+				}
 				else if (current_uid() == 0){
 					
-					if (check_pid_monitored(syscall, pid) == 0) {
-						return -EBUSY;
+					// check if pid list is empty
+					if (table[syscall].monitored == 0){
+						return -EINVAL;
 					}
-
 					del_pid_sysc(pid, syscall);
-					// table[syscall].monitored = 1;
+					if (table[syscall].listcount == 0){
+						table[syscall].monitored = 0;
+					}
 					// return something ;
 					return 0;
 				}
@@ -543,13 +573,15 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 					if (caller_owns_pid != 0){
 						return -EPERM;
 					}
-
-					if (check_pid_monitored(syscall, pid) == 0) {
-						return -EBUSY;
+					if (table[syscall].monitored == 0){
+						return -EINVAL;
 					}
 
 					del_pid_sysc(pid, syscall);
-					// table[syscall].monitored = 1;
+					// check if pid list is empty
+					if (table[syscall].listcount == 0){
+						table[syscall].monitored = 0;
+					}
 					// return something ;
 					return 0;
 				}
